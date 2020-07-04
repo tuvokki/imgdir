@@ -112,3 +112,4 @@ venv.bak/
 **/COMPILED/
 staticfiles/
 uploads/
+.DS_Store
