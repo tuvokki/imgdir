@@ -8,13 +8,13 @@ from tkinter import filedialog
 
 from PIL import Image, ImageTk
 
-# ARROWS = (8320768, 8124162, 8255233, 8189699)
 ARROWS = {
     8124162: 'LEFT',
     8189699: 'RIGHT',
     8320768: 'UP',
     8255233: 'DOWN',
     7730984: 'DELETE',
+    3342463: 'DELETE',
 }
 
 
@@ -24,22 +24,23 @@ class Window(Frame):
         self.master = master
         self.master.bind("<Escape>", self.toggle_geom)
         self.master.bind("<Key>", self.key_pressed)
+        self.master.bind("<Configure>", self.window_resize)
         self.pack(fill=BOTH, expand=1)
         self.screen_padding = 10
         self._geom = '200x200+0+0'
         self.img_loaded = 0
+        self.showing = None
+        self.debug = False
 
-        self.screen_width = master.winfo_screenwidth() - 10 * self.screen_padding
-        self.screen_height = master.winfo_screenheight() - 10 * self.screen_padding
-        root.geometry(f"{self.screen_width}x{self.screen_height}+{3 * self.screen_padding}+{3 * self.screen_padding}")
-
-        # Build a list of tuples for each file type the file dialog should display
-        my_filetypes = [('all files', '.*'), ('text files', '.txt')]
+        self.screen_width = master.winfo_screenwidth()
+        self.screen_height = master.winfo_screenheight()
+        self.master.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
 
         # Ask the user to select a folder.
         answer = filedialog.askdirectory(parent=root,
                                          initialdir=Path.home(),
                                          title="Please select a folder:")
+
         # TODO: answer can be None
         self.image_list = []
         type_list = ['jpg', 'jpeg', 'png']
@@ -47,24 +48,32 @@ class Window(Frame):
         flat_list = [item for sublist in file_list for item in sublist]
 
         for filename in flat_list:
-            im = Image.open(filename)
-            self.image_list.append(im)
+            self.image_list.append(filename)
         self.load_snake(self.image_list[self.img_loaded])
 
-    def load_snake(self, image=None):
-        if not image:
-            load = Image.open("Aztec_Xuicoatl.jpg")
-        else:
-            load = image
-        newsize = (self.screen_width - self.screen_padding, self.screen_height - self.screen_padding)
+    def load_snake(self, file_name='Aztec_Xuicoatl.jpg'):
+        image = Image.open(file_name)
+        ratio = min(self.screen_width / image.width, self.screen_height / image.height)
+        new_size = (int(image.width*ratio), int(image.height*ratio))
+
         try:
-            load = load.resize(newsize)
-            render = ImageTk.PhotoImage(load)
+            image = image.resize(new_size)
+            render = ImageTk.PhotoImage(image)
             img = Label(self, image=render)
+            if self.debug:
+                img['text'] = f'{file_name} ({image.height} x {image.width})'
+                img['compound'] = 'bottom'
             img.image = render
-            img.place(x=self.screen_padding, y=self.screen_padding)
+
+            x = (self.screen_width - image.width) / 2
+            y = (self.screen_height - image.height) / 2
+            img.place(x=x, y=y)
+
+            if self.showing:
+                self.showing.destroy()
+            self.showing = img
         except OSError as e:
-            print(f'Image {image.filename} could not be loaded.')
+            print(f'Image {file_name} could not be loaded. {e}')
             pass
         root.focus_force()
 
@@ -74,6 +83,11 @@ class Window(Frame):
         self.master.geometry(self._geom)
         self._geom = geom
 
+    def window_resize(self, event):
+        self.screen_width = self.master.winfo_screenwidth() - 10 * self.screen_padding
+        self.screen_height = self.master.winfo_screenheight() - 10 * self.screen_padding
+        root.geometry(f"{self.screen_width}x{self.screen_height}+{3 * self.screen_padding}+{3 * self.screen_padding}")
+
     def key_pressed(self, event):
         print(f'Arrow pressed {event.keycode}: {ARROWS.get(event.keycode,"UNKNOWN")}')
         if ARROWS.get(event.keycode,"UNKNOWN") == 'RIGHT':
@@ -82,7 +96,7 @@ class Window(Frame):
             self.img_loaded -= 1
         if ARROWS.get(event.keycode, "UNKNOWN") == 'DELETE':
             try:
-                delete_file = self.image_list[self.img_loaded].filename
+                delete_file = self.image_list[self.img_loaded]
                 os.remove(delete_file)
                 print(f"Deleted: {delete_file}.")
             except OSError as e:
@@ -90,7 +104,6 @@ class Window(Frame):
                 print(f"Error: {e.filename} - {e.strerror}.")
             finally:
                 del self.image_list[self.img_loaded]
-                self.img_loaded += 1
 
         # Make sure to always have a valid image to load
         # TODO: exit sequence if image_list is empty
