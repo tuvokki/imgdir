@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+data/
+.idea/
 
 # C extensions
 *.so
@@ -114,3 +116,6 @@ staticfiles/
 uploads/
 .DS_Store
 
+/in/
+/config.ini
+/data/model.h5
